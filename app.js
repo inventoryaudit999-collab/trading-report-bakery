@@ -157,34 +157,52 @@ function startApp(){
 /* ════ PRESENCE SYSTEM ════
    Firebase path: presence/{storeNo}
    { no, name, loginAt, lastSeen, ua, online:true }
-   ใช้ onDisconnect() ให้ Firebase set online=false อัตโนมัติเมื่อ browser ปิด
+   ใช้ onDisconnect() + .info/connected สำหรับ reliable presence
 ════════════════════════════════════════════ */
 let _presenceRef = null;
 let _presenceInterval = null;
+let _connectedRef = null;
 
-function initPresence(){
+async function initPresence(){
   if(!fbOk || SES.role !== 'store') return;
   const path = `presence/${SES.no}`;
   _presenceRef = db.ref(path);
-  const data = {
-    no: SES.no,
-    name: SES.name,
-    loginAt: Date.now(),
-    lastSeen: Date.now(),
-    ua: navigator.userAgent,
-    online: true
-  };
-  _presenceRef.set(data);
-  /* เมื่อ disconnect → set online=false + lastSeen */
-  _presenceRef.onDisconnect().update({ online: false, lastSeen: db.ServerValue ? db.ServerValue.TIMESTAMP : Date.now() });
+
+  /* ใช้ .info/connected เพื่อรู้ว่า connected จริงๆ ก่อน set presence */
+  _connectedRef = db.ref('.info/connected');
+  _connectedRef.on('value', async (snap) => {
+    if(snap.val() !== true) return;
+    /* เมื่อ disconnect → Firebase server จะ set online=false ทันที */
+    await _presenceRef.onDisconnect().update({
+      online: false,
+      lastSeen: firebase.database.ServerValue.TIMESTAMP
+    });
+    /* เขียน presence ทันทีที่ connected */
+    await _presenceRef.set({
+      no: String(SES.no),
+      name: SES.name,
+      loginAt: Date.now(),
+      lastSeen: Date.now(),
+      ua: navigator.userAgent,
+      online: true
+    });
+  });
   /* heartbeat ทุก 30 วินาที */
-  _presenceInterval = setInterval(()=>{
-    if(_presenceRef) _presenceRef.update({ lastSeen: Date.now(), online: true });
+  _presenceInterval = setInterval(async () => {
+    if(_presenceRef && FB_ONLINE){
+      try { await _presenceRef.update({ lastSeen: Date.now(), online: true }); }
+      catch(e) { /* ignore */ }
+    }
   }, 30000);
 }
 
 function cleanupPresence(){
-  if(_presenceRef){ _presenceRef.update({ online: false, lastSeen: Date.now() }); _presenceRef = null; }
+  if(_connectedRef){ _connectedRef.off(); _connectedRef = null; }
+  if(_presenceRef){
+    _presenceRef.onDisconnect().cancel();
+    _presenceRef.update({ online: false, lastSeen: Date.now() });
+    _presenceRef = null;
+  }
   if(_presenceInterval){ clearInterval(_presenceInterval); _presenceInterval = null; }
 }
 
