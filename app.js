@@ -88,19 +88,24 @@ function initFBConnectionMonitor(){
 
 /* ════ NAV ════ */
 const STORE_NAV=[
+  {section:'ภาพรวม'},
   {id:'dashboard', ico:'📊', lbl:'แดชบอร์ด'},
+  {section:'ข้อมูล'},
   {id:'entry',     ico:'📝', lbl:'บันทึกการตรวจนับ'},
   {id:'history',   ico:'🗂️', lbl:'ประวัติ / Export'}
 ];
 const ADMIN_NAV=[
-  {id:'dashboard',     ico:'📊', lbl:'แดชบอร์ด & ภาพรวม'},
-  {id:'monthcontrol',  ico:'📅', lbl:'จัดการเดือน (Month Control)'},
-  {id:'storedata',     ico:'🏪', lbl:'ดูข้อมูลรายสาขา'},
+  {section:'ภาพรวม'},
+  {id:'dashboard',     ico:'📊', lbl:'แดชบอร์ด'},
   {id:'storestatus',   ico:'📋', lbl:'สถานะการบันทึก'},
-  {id:'presence',      ico:'🟢', lbl:'สาขาออนไลน์'},
-  {id:'manageitems',   ico:'📦', lbl:'จัดการรายการสินค้า'},
-  {id:'managestores',  ico:'🏬', lbl:'จัดการสาขา'},
-  {id:'clearall',      ico:'🗑️', lbl:'ล้างข้อมูล'}
+  {id:'presence',      ico:'👥', lbl:'ผู้ใช้งานออนไลน์'},
+  {section:'ข้อมูล'},
+  {id:'storedata',     ico:'🔍', lbl:'ข้อมูลการตรวจนับ'},
+  {id:'manageitems',   ico:'📦', lbl:'รายการสินค้า'},
+  {section:'ตั้งค่า & ดูแลระบบ'},
+  {id:'managestores',  ico:'🏪', lbl:'จัดการสาขา'},
+  {id:'monthcontrol',  ico:'📅', lbl:'จัดการเดือนที่เปิด/ปิด'},
+  {id:'clearall',      ico:'🗑️', lbl:'ล้างข้อมูลทั้งหมด'}
 ];
 
 /* ════ ENTRY STATE ════ */
@@ -114,7 +119,10 @@ function closeSB(){document.getElementById('sidebar').classList.remove('open');d
 function setTB(t,s=''){document.getElementById('tbTitle').textContent=t;document.getElementById('tbSub').textContent=s;}
 function buildNav(){
   const nav=SES.role==='store'?STORE_NAV:ADMIN_NAV;
-  document.getElementById('sbNav').innerHTML=nav.map(n=>`<div class="nav-item" data-id="${n.id}"><span class="ico">${n.ico}</span>${n.lbl}</div>`).join('');
+  document.getElementById('sbNav').innerHTML=nav.map(n=>{
+    if(n.section) return `<div class="nav-section-label">${n.section}</div>`;
+    return `<div class="nav-item" data-id="${n.id}"><span class="ico">${n.ico}</span>${n.lbl}</div>`;
+  }).join('');
   document.querySelectorAll('.nav-item').forEach(el=>el.addEventListener('click',()=>{go(el.dataset.id);closeSB();}));
 }
 function setActive(id){document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.id===id));}
