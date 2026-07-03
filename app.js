@@ -983,6 +983,94 @@ async function renderAdminDashboardForYM(C, mc, selYM){
 
   const isPast = selYM < curYM;
   const isCur  = selYM === curYM;
+
+  /* ═══ คำนวณสถิติ Class (Items + QTY) ═══ */
+  const classMap = {};
+  ITEMS_DATA.forEach(item => {
+    const cls = String(item.class);
+    if(!classMap[cls]) classMap[cls] = { totalItems: 0, filledQty: 0 };
+    classMap[cls].totalItems++;
+  });
+  Object.keys(allE).forEach(sNo => {
+    const mData = (allE[sNo] || {})[selYM] || {};
+    Object.keys(mData).forEach(code => {
+      const v = parseFloat(mData[code]);
+      if(!isNaN(v) && v !== 0) {
+        const item = ITEMS_DATA.find(i => i.code === code);
+        if(item) {
+          const cls = String(item.class);
+          if(classMap[cls]) classMap[cls].filledQty += v;
+        }
+      }
+    });
+  });
+  const classKeys = Object.keys(classMap).sort((a,b) => {
+    const na=Number(a), nb=Number(b);
+    return (!isNaN(na)&&!isNaN(nb)) ? na-nb : a.localeCompare(b);
+  });
+  const maxItems = Math.max(...classKeys.map(c=>classMap[c].totalItems), 1);
+  const maxQty   = Math.max(...classKeys.map(c=>classMap[c].filledQty), 1);
+  const chartColors = ['#0E8B8B','#2EC4B6','#F0A030','#059669','#60A5FA','#A78BFA','#F472B6','#FB923C','#34D399','#818CF8'];
+  function cColor(i){ return chartColors[i % chartColors.length]; }
+
+  const classChartHTML = `
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-head">
+        <div class="card-title">📊 ภาพรวมรายการสินค้าแยกตาม Class — ${ymToFull(selYM)}</div>
+        <div style="font-size:12px;color:var(--txt3)">${classKeys.length} Class · ${ITEMS_DATA.length} รายการ</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div style="background:var(--surface2);border-radius:var(--r12);padding:16px;border:1px solid var(--border2)">
+          <div style="font-size:12.5px;font-weight:700;color:var(--txt2);margin-bottom:12px;display:flex;align-items:center;gap:6px">
+            <span style="width:10px;height:10px;border-radius:3px;background:var(--blue);display:inline-block"></span>
+            จำนวน Item ในแต่ละ Class
+          </div>
+          ${classKeys.map((cls,i) => {
+            const d = classMap[cls];
+            const pct = Math.round((d.totalItems / maxItems) * 100);
+            return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+              <div style="min-width:56px;font-size:11px;font-weight:700;color:var(--txt2);text-align:right">Class ${cls}</div>
+              <div style="flex:1;height:20px;background:var(--surface);border-radius:5px;overflow:hidden;border:1px solid var(--border2)">
+                <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,${cColor(i)},${cColor(i)}BB);border-radius:5px"></div>
+              </div>
+              <div style="min-width:32px;font-size:11.5px;font-weight:800;color:var(--txt);font-family:var(--mono);text-align:right">${d.totalItems}</div>
+            </div>`;
+          }).join('')}
+          <div style="margin-top:8px;text-align:right;font-size:10.5px;color:var(--txt4)">รวม ${ITEMS_DATA.length} รายการ</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:var(--r12);padding:16px;border:1px solid var(--border2)">
+          <div style="font-size:12.5px;font-weight:700;color:var(--txt2);margin-bottom:12px;display:flex;align-items:center;gap:6px">
+            <span style="width:10px;height:10px;border-radius:3px;background:var(--amber);display:inline-block"></span>
+            QTY รวมที่บันทึก ในแต่ละ Class
+          </div>
+          ${classKeys.map((cls,i) => {
+            const d = classMap[cls];
+            const pct = maxQty > 0 ? Math.round((d.filledQty / maxQty) * 100) : 0;
+            return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+              <div style="min-width:56px;font-size:11px;font-weight:700;color:var(--txt2);text-align:right">Class ${cls}</div>
+              <div style="flex:1;height:20px;background:var(--surface);border-radius:5px;overflow:hidden;border:1px solid var(--border2)">
+                <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,${cColor(i+3)},${cColor(i+3)}BB);border-radius:5px"></div>
+              </div>
+              <div style="min-width:50px;font-size:11.5px;font-weight:800;color:var(--txt);font-family:var(--mono);text-align:right">${fNum(d.filledQty,0)}</div>
+            </div>`;
+          }).join('')}
+          <div style="margin-top:8px;text-align:right;font-size:10.5px;color:var(--txt4)">QTY รวม ${fNum(selQty,2)}</div>
+        </div>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+        ${classKeys.map((cls,i) => {
+          const d = classMap[cls];
+          const qtyPct = selQty > 0 ? Math.round((d.filledQty / selQty) * 100) : 0;
+          return `<div style="display:flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r8);padding:5px 10px">
+            <div style="width:8px;height:8px;border-radius:2px;background:${cColor(i)}"></div>
+            <span style="font-size:10.5px;font-weight:700;color:var(--txt2)">Class ${cls}</span>
+            <span style="font-size:10px;color:var(--txt4)">${d.totalItems} items</span>
+            <span style="font-size:10px;font-weight:700;color:var(--blue);font-family:var(--mono)">${qtyPct}%</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
   const periodBadge = isCur
     ? `<span style="font-size:11px;background:var(--blue-xl);color:var(--blue);border-radius:999px;padding:2px 8px">ปัจจุบัน</span>`
     : isPast
@@ -1051,6 +1139,8 @@ async function renderAdminDashboardForYM(C, mc, selYM){
         <div style="display:flex;flex-wrap:wrap;gap:5px">${pastActive.map(ym=>`<div style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.6);border:1px solid rgba(212,139,10,.3);border-radius:var(--r8);padding:3px 8px"><span style="font-size:11px;font-weight:700;color:var(--warn)">${ymToFull(ym)}</span><button onclick="toggleMonth('${ym}',false)" style="background:none;border:none;cursor:pointer;color:var(--txt4);font-size:11px;padding:0;line-height:1">✕</button></div>`).join('')}</div>
       </div>` : ''}
     </div>
+
+    ${classChartHTML}
 
     <div class="card">
       <div class="card-head" style="flex-wrap:wrap;gap:8px">
